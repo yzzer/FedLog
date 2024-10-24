@@ -1,0 +1,10 @@
+servers:
+  0:
+    client_host: 127.0.0.1
+    client_port: 16877
+    server_host: 127.0.0.1
+    server_port: 16899
+
+fedserver:
+  host: 127.0.0.1
+  port: 17344
