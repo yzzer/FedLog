@@ -1,92 +1,29 @@
 import logging
-import requests
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
 from torchvision import datasets
 from torch.utils.data import DataLoader
-from pydantic import BaseModel
+from handler.mnist_demo.bean import ServerInfo, FedModel
+from handler.mnist_demo.client import *
+from threading import Lock
+from utils.fedavg import fedavg
 
 from models.mnist_demo import MnistModel
 from config import get_config
+from concurrent.futures import ThreadPoolExecutor
+
+
 from utils.tensor import (
     TensorData,
     tensor_to_base64,
     base64_to_tensor,
     load_state_from_base64,
     model_to_base64,
+    base64_to_state
 )
 
-
-class ServerInfo(BaseModel):
-    host: str = ""
-    port: int = 0
-
-
-class FedModel(BaseModel):
-    input_model_base64: str = None
-    main_model_base64: str = None
-    output_model_base64: str = None
-    model_base64: str = None
-    type: str = "fl"
-
-
-class TrainService:
-    def __init__(self, host, port):
-        self.host = host
-        self.port = port
-        self.address = f"http://{self.host}:{self.port}"
-
-    def ping(self):
-        url = self.address + "/ping"
-        resp = requests.get(url=url)
-        assert resp.status_code == 200
-
-    def forward(self, input):
-        """
-        传递输入, 并从远程训练服务器返回梯度
-        """
-        tensor_data = TensorData(tensor=tensor_to_base64(input), shape=list(input.shape))
-        url = self.address + "/mnist/demo/forward"
-        resp = requests.post(url=url, data=tensor_data.model_dump_json())
-        assert resp.status_code == 200
-        grad_tensor_data = TensorData(**resp.json())
-        grad = base64_to_tensor(grad_tensor_data.tensor, grad_tensor_data.shape)
-        return grad
-
-    def load_model(self, model: nn.Module):
-        url = self.address + "/mnist/demo/model/"
-        resp = requests.get(url)
-        assert resp.status_code == 200
-        load_state_from_base64(resp.text, model)
-        
-    def send_model(self, model: nn.Module):
-        pass
-
-
-class ClientSevice:
-    def __init__(self, host, port):
-        self.host = host
-        self.port = port
-        self.address = f"http://{self.host}:{self.port}"
-        
-
-    def forward(self, input: torch.Tensor):
-        """
-        传递输入, 并从客户端服务器返回梯度
-        """
-        tensor_data = TensorData(tensor=tensor_to_base64(input), shape=list(input.shape))
-        url = self.address + "/mnist/demo/forward"
-        resp = requests.post(url=url, data=tensor_data.model_dump_json())
-        assert resp.status_code == 200
-        grad_tensor_data = TensorData(**resp.json())
-        grad = base64_to_tensor(grad_tensor_data.tensor, grad_tensor_data.shape)
-        return grad
-    
-    
-    def send_model(self, model: MnistModel, part: str):
-        pass
 
 
 class MnistTrainServerApp:
@@ -131,20 +68,9 @@ class MnistTrainServerApp:
 
     def get_model(self) -> str:
         return model_to_base64(self.model.main_model)
-
-
-
-class MnistFedService:
     
-    def __init__(self):
-        conf = get_config()
-        self.host = conf.fedserver.host
-        self.port = conf.fedserver.port
-        self.address = f"http://{self.host}:{self.port}"
-        
-    def collect_model(self, model: MnistModel, type: str):
-        pass
-    
+    def send_model(self, model: FedModel):
+        load_state_from_base64(model.main_model_base64, self.model.main_model)
 
 
 class MnistFedApp:
@@ -154,9 +80,13 @@ class MnistFedApp:
         self.local_main_models = []
         self.local_input_models = []
         self.local_output_models = []
+        self.mode = None
         self.now_global_epoch = 0
+        self.target_global_epoch = 10
         
         self.global_model = MnistModel()
+        
+        self.lock = Lock()
         
         transform = transforms.Compose([transforms.ToTensor()])
         test_dataset = datasets.MNIST(
@@ -173,8 +103,12 @@ class MnistFedApp:
         self.trainers = [
             TrainService(group.server_host, group.server_port) for group in get_config().server_groups.values()
         ]
+        self.weights = [
+            1. for _ in range(len(self.clients))
+        ]
         
-
+        self.workers = ThreadPoolExecutor(max_workers=20)
+        
     @staticmethod
     def get_instance():
         if MnistFedApp.app is None:
@@ -195,17 +129,75 @@ class MnistFedApp:
                 f"Accuracy of the model on the test images: {100 * correct / total:.2f}%"
             )
     
-    def _broadcast_model(self):
-        pass
+    def _collect_main_models(self):
+        self.local_main_models = [None] * len(self.clients)
+        def bc_main(train: TrainService, idx: int):
+            self.local_main_models[idx] = train.get_model()
+        self.workers.map(bc_main, self.trainers, range(len(self.trainers)))
+        logging.info(f"collected models from trainers")
     
-    def start_fl_job(self, local_epoch=3, global_epoch=10):
-        pass
+    def _broadcast_model(self):
+        if self.mode == "fl":
+            def bc_fl(client: ClientSevice):
+                client.send_model(self.global_model, self.mode)
+            self.workers.map(bc_fl, self.clients)
+        else:
+            def bc_sl(client: ClientSevice, trainer: TrainService):
+                client.send_model(self.global_model, self.mode)
+                trainer.send_model(self.global_model)    
+            self.workers.map(bc_sl, self.clients, self.trainers)
+        logging.info(f"send models to clients in {self.mode} mode")
+            
+    def start_job(self, mode="fl", local_epoch=3, global_epoch=10):
+        self.mode = mode
+        def start_job(client: ClientSevice):
+            client.start_job(mode, local_epoch, global_epoch)
+        self.workers.map(start_job, self.clients)
+        logging.info("send job to clients")
+        self._broadcast_model()       
       
-    def start_sl_job(self, local_epoch=3, global_epoch=10):
-        pass
-      
-    def collect_model(self, model_base64: str):
-        pass
+    def collect_model(self, model: FedModel):
+        local_input_model = None
+        local_output_model = None
+        local_main_model = None
+        
+        if model.input_model_base64 is not None:
+            local_input_model = base64_to_state(model.input_model_base64)
+        if model.output_model_base64 is not None:
+            local_output_model = base64_to_state(model.output_model_base64)
+        if model.main_model_base64 is not None:
+            local_main_model = base64_to_state(model.main_model_base64)
+        
+        with self.lock:
+            if model.type == "fl":
+                self.local_main_models.append(local_main_model)
+            else:
+                if local_input_model is not None:
+                    self.local_input_models.append(local_input_model)
+                if local_output_model is not None:
+                    self.local_output_models.append(local_output_model)
+                if local_main_model is not None:
+                    self.local_main_models.append(local_main_model)
+            finish_global_epoch = False
+            if self.mode == "fl" and len(self.local_main_models) == len(self.clients):
+                fedavg(self.global_model, self.local_main_models, self.weights)
+                finish_global_epoch = True
+            elif self.mode == "sl" and len(self.local_input_models) == len(self.clients) \
+                and len(self.local_output_models) == len(self.clients):
+                self._collect_main_models()
+                fedavg(self.global_model.input_model, self.local_input_models, self.weights)
+                fedavg(self.global_model.output_model, self.local_output_models, self.weights)
+                fedavg(self.global_model.main_model, self.local_main_models, self.weights)
+                finish_global_epoch = True
+                
+            if finish_global_epoch:
+                self.now_global_epoch += 1
+                if self.now_global_epoch <= self.target_global_epoch:
+                    self._eval()
+                    self._broadcast_model()
+                self.local_main_models.clear()
+                self.local_input_models.clear()
+                self.local_output_models.clear()
 
 
 class MnistClientApp:
@@ -239,7 +231,6 @@ class MnistClientApp:
         if MnistClientApp.app is None:
             MnistClientApp.app = MnistClientApp()
         return MnistClientApp.app
-    
             
     def prepare_env(self, epoch=5, batch=512):
         conf = get_config()
@@ -265,8 +256,7 @@ class MnistClientApp:
         else:
             load_state_from_base64(model_do.input_model_base64, self.model.input_model)
             load_state_from_base64(model_do.output_model_base64, self.model.output_model)
-            
-        
+                 
         # 后台线程启动训练
         import threading
 
@@ -282,8 +272,7 @@ class MnistClientApp:
         else:
             return FedModel(
                 input_model_base64=model_to_base64(self.model.input_model),
-                output_model_base64=model_to_base64(self.model.output_model)
-            )
+                output_model_base64=model_to_base64(self.model.output_model))
     
     def start_fl_train(self):
         import time
@@ -301,8 +290,10 @@ class MnistClientApp:
         end_time = time.time()
         logging.info("train time: {}".format(end_time - start_time))
     
-    def start_fl_job(self):
+    def start_fl_job(self, local_epoch=5, batch=512):
         self.prepare_env()   
+        self.epoch = local_epoch
+        self.batch = batch
         logging.info("fl env prepared")
         
     def start_sl_train(self):
@@ -321,10 +312,9 @@ class MnistClientApp:
                 self.input_optimizer.step()
         self.fed.collect_model(self.model, "sl")
         end_time = time.time()
-        logging.info("train time: {}".format(end_time - start_time))
-          
+        logging.info("train time: {}".format(end_time - start_time))       
 
-    def start_sl_job(self, epoch=5, batch=512) -> dict:
+    def start_sl_job(self, local_epoch=5, batch=512) -> dict:
         self.prepare_env(epoch=epoch, batch=batch)
         
         # 将client的信息发送给server

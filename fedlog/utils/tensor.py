@@ -39,3 +39,6 @@ def model_to_base64(model: torch.nn.Module) -> str:
 
 def load_state_from_base64(base64_str: str, model: torch.nn.Module):
     model.load_state_dict(pickle.loads(base64.b64decode(base64_str)))
+
+def base64_to_state(base64_str: str) -> dict:
+    return pickle.loads(base64.b64decode(base64_str))

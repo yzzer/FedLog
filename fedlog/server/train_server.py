@@ -8,7 +8,8 @@ sys.path.append("..")
 
 from fastapi import FastAPI
 from config import init_config, get_config
-from handler.demo import MnistTrainServerApp
+from handler.mnist_demo.handler import MnistTrainServerApp
+from handler.mnist_demo.bean import FedModel
 from utils.tensor import TensorData
 
 # 创建 FastAPI 应用实例
@@ -31,6 +32,10 @@ async def ping():
 async def mnist_model():
     return MnistTrainServerApp.get_instance().get_model()
 
+@app.post("/mnist/demo/send_model/")
+async def send_mnist_model(model: FedModel):
+    return MnistTrainServerApp.get_instance().send_model(model)
+
 
 @app.post("/mnist/demo/forward/")
 async def mnist_forward(tensor: TensorData):
@@ -42,4 +47,4 @@ if __name__ == "__main__":
     conf = get_config()
     
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=conf.server_config.server_port)
+    uvicorn.run(app, host="0.0.0.0", port=conf.server_config.server_port, workers=1)

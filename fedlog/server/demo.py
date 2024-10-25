@@ -26,4 +26,4 @@ async def read_item(item_id: int, q: str = None):
 # 启动命令（如果以脚本形式运行该文件）
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, workers=1)
