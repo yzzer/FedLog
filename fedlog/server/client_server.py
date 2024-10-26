@@ -27,7 +27,7 @@ async def mnist_output_forward(input: TensorData):
 
 
 @app.get("/mnist/demo/start")
-async def start_mnist_job(mode: str = "fl", local_epoch: int = 5, batch: int = 512):
+async def start_mnist_job(mode: str = "fl", local_epoch: int = 5, batch: int = 1024):
     if mode == "fl":
         res =  MnistClientApp.get_instance().start_fl_job(local_epoch, batch)
     else:
