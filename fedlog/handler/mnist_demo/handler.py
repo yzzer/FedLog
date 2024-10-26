@@ -87,6 +87,7 @@ class MnistFedApp:
         self.global_model = MnistModel()
         
         self.lock = Lock()
+        self.start_time = 0
         
         transform = transforms.Compose([transforms.ToTensor()])
         test_dataset = datasets.MNIST(
@@ -104,7 +105,7 @@ class MnistFedApp:
             TrainService(group.server_host, group.server_port) for group in get_config().server_groups.values()
         ]
         self.weights = [
-            1. for _ in range(len(self.clients))
+            group.weight for group in get_config().server_groups.values()
         ]
         
         self.workers = ThreadPoolExecutor(max_workers=20)
@@ -116,95 +117,132 @@ class MnistFedApp:
         return MnistFedApp.app
     
     def _eval(self):
-        self.model.eval()
+        self.global_model.eval()
+        correct = 0
+        total = 0
         with torch.no_grad():
-            correct = 0
-            total = 0
             for inputs, labels in self.test_loader:
-                outputs = self.model(inputs)
+                outputs = self.global_model(inputs)
                 _, predicted = torch.max(outputs.data, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
-            logging.info(
-                f"Accuracy of the model on the test images: {100 * correct / total:.2f}%"
-            )
+        logging.info(
+            f"gloabl_epoch={self.now_global_epoch} Accuracy of the model on the test images: {100 * correct / total:.2f}%"
+        )
     
     def _collect_main_models(self):
         self.local_main_models = [None] * len(self.clients)
         def bc_main(train: TrainService, idx: int):
             self.local_main_models[idx] = train.get_model()
-        self.workers.map(bc_main, self.trainers, range(len(self.trainers)))
+            return True
+        if not all(self.workers.map(bc_main, self.trainers, range(len(self.trainers)))):
+            raise Exception("get model failed")
         logging.info(f"collected models from trainers")
     
     def _broadcast_model(self):
         if self.mode == "fl":
             def bc_fl(client: ClientSevice):
                 client.send_model(self.global_model, self.mode)
-            self.workers.map(bc_fl, self.clients)
+                return True
+            if not all(self.workers.map(bc_fl, self.clients)):
+                raise Exception("send model failed")
         else:
             def bc_sl(client: ClientSevice, trainer: TrainService):
                 client.send_model(self.global_model, self.mode)
                 trainer.send_model(self.global_model)    
-            self.workers.map(bc_sl, self.clients, self.trainers)
+                return True
+            if not all(self.workers.map(bc_sl, self.clients, self.trainers)):
+                raise Exception("send model failed")
         logging.info(f"send models to clients in {self.mode} mode")
+        
+    def _collect_report(self):
+        def get_report(client: ClientSevice):
+            return client.get_report()
+        reports = self.workers.map(get_report, self.clients)
+        from utils.monitor import MonitorReportor
+        return MonitorReportor.merge_report(list(reports))
+        
             
     def start_job(self, mode="fl", local_epoch=3, global_epoch=10):
         self.mode = mode
+        
+        import time
+        self.start_time = time.time()
         def start_job(client: ClientSevice):
             client.start_job(mode, local_epoch, global_epoch)
-        self.workers.map(start_job, self.clients)
+            return True
+        if not all(self.workers.map(start_job, self.clients)):
+            raise Exception("start job failed")
         logging.info("send job to clients")
-        self._broadcast_model()       
+        self._broadcast_model()   
+        return {
+            "status": "started",
+            "client_num": len(self.clients),
+            "global_epoch": global_epoch,
+            "local_epoch": local_epoch,
+            "mode": mode,
+        }    
       
     def collect_model(self, model: FedModel):
         local_input_model = None
         local_output_model = None
         local_main_model = None
         
-        if model.input_model_base64 is not None:
+        if model.input_model_base64 != "":
             local_input_model = base64_to_state(model.input_model_base64)
-        if model.output_model_base64 is not None:
+        if model.output_model_base64 != "":
             local_output_model = base64_to_state(model.output_model_base64)
-        if model.main_model_base64 is not None:
+        if model.main_model_base64 != "":
             local_main_model = base64_to_state(model.main_model_base64)
         
-        with self.lock:
-            if model.type == "fl":
-                self.local_main_models.append(local_main_model)
-            else:
-                if local_input_model is not None:
-                    self.local_input_models.append(local_input_model)
-                if local_output_model is not None:
-                    self.local_output_models.append(local_output_model)
-                if local_main_model is not None:
+        def merge(): 
+            with self.lock:
+                if model.type == "fl":
                     self.local_main_models.append(local_main_model)
-            finish_global_epoch = False
-            if self.mode == "fl" and len(self.local_main_models) == len(self.clients):
-                fedavg(self.global_model, self.local_main_models, self.weights)
-                finish_global_epoch = True
-            elif self.mode == "sl" and len(self.local_input_models) == len(self.clients) \
-                and len(self.local_output_models) == len(self.clients):
-                self._collect_main_models()
-                fedavg(self.global_model.input_model, self.local_input_models, self.weights)
-                fedavg(self.global_model.output_model, self.local_output_models, self.weights)
-                fedavg(self.global_model.main_model, self.local_main_models, self.weights)
-                finish_global_epoch = True
-                
-            if finish_global_epoch:
-                self.now_global_epoch += 1
-                if self.now_global_epoch <= self.target_global_epoch:
-                    self._eval()
-                    self._broadcast_model()
-                self.local_main_models.clear()
-                self.local_input_models.clear()
-                self.local_output_models.clear()
+                else:
+                    if local_input_model is not None:
+                        self.local_input_models.append(local_input_model)
+                    if local_output_model is not None:
+                        self.local_output_models.append(local_output_model)
+                    if local_main_model is not None:
+                        self.local_main_models.append(local_main_model)
+                finish_global_epoch = False
+                if self.mode == "fl" and len(self.local_main_models) == len(self.clients):
+                    fedavg(self.global_model, self.local_main_models, self.weights)
+                    finish_global_epoch = True
+                elif self.mode == "sl" and len(self.local_input_models) == len(self.clients) \
+                    and len(self.local_output_models) == len(self.clients):
+                    self._collect_main_models()
+                    fedavg(self.global_model.input_model, self.local_input_models, self.weights)
+                    fedavg(self.global_model.output_model, self.local_output_models, self.weights)
+                    fedavg(self.global_model.main_model, self.local_main_models, self.weights)
+                    finish_global_epoch = True
+                    
+                if finish_global_epoch:
+                    self.now_global_epoch += 1
+                    if self.now_global_epoch <= self.target_global_epoch:
+                        self._eval()
+                        self._broadcast_model()
+                    else:
+                        import time
+                        logging.info(f"job cost time: {time.time() - self.start_time} s")
+                        logging.info(f"client monitor report: {self._collect_report()}")
+                    self.local_main_models.clear()
+                    self.local_input_models.clear()
+                    self.local_output_models.clear()
+                    self.global_model = MnistModel()
+                    
+                    
+        import threading
+        thread = threading.Thread(target=merge)
+        thread.start()
 
 
 class MnistClientApp:
     app = None
 
     def __init__(self):
-        self.model: MnistModel = MnistModel()
+        self.model: MnistModel = None
         self.train_server: ServerInfo = ServerInfo()
         self.client_server: ServerInfo = ServerInfo()
 
@@ -244,7 +282,7 @@ class MnistClientApp:
         train_dataset = datasets.MNIST(
             root="../../data", train=True, download=True, transform=transform
         )
-        self.train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=False)
+        self.train_loader = DataLoader(train_dataset, batch_size=batch, shuffle=True)
         
         self.epoch = epoch
         self.batch = batch
@@ -252,7 +290,7 @@ class MnistClientApp:
     def send_model(self, model_do: FedModel):
         # 通过广播模型触发训练
         if model_do.type == "fl":
-            load_state_from_base64(model_do.model_base64, self.model)
+            load_state_from_base64(model_do.main_model_base64, self.model)
         else:
             load_state_from_base64(model_do.input_model_base64, self.model.input_model)
             load_state_from_base64(model_do.output_model_base64, self.model.output_model)
@@ -289,11 +327,16 @@ class MnistClientApp:
         self.fed.collect_model(self.model, "fl")
         end_time = time.time()
         logging.info("train time: {}".format(end_time - start_time))
+        import gc
+        gc.collect()
     
     def start_fl_job(self, local_epoch=5, batch=512):
         self.prepare_env()   
         self.epoch = local_epoch
         self.batch = batch
+        self.model = MnistModel()
+        self.optimizer = optim.Adam(self.model.parameters(), lr=0.001)
+        
         logging.info("fl env prepared")
         
     def start_sl_train(self):
@@ -312,16 +355,23 @@ class MnistClientApp:
                 self.input_optimizer.step()
         self.fed.collect_model(self.model, "sl")
         end_time = time.time()
-        logging.info("train time: {}".format(end_time - start_time))       
+        logging.info("train time: {}".format(end_time - start_time))  
+        import gc
+        gc.collect()     
 
     def start_sl_job(self, local_epoch=5, batch=512) -> dict:
-        self.prepare_env(epoch=epoch, batch=batch)
+        self.prepare_env(epoch=local_epoch, batch=batch)
         
         # 将client的信息发送给server
         server = TrainService(self.train_server.host, self.train_server.port)
         server.ping()
         self.trainer = server
-
+        self.model = MnistModel()
+        
+        del self.model.main_model
+        import gc
+        gc.collect()
+        
         # train
         self.input_optimizer = optim.Adam(self.model.input_model.parameters(), lr=0.001)
         self.output_optimizer = optim.Adam(self.model.output_model.parameters(), lr=0.001)

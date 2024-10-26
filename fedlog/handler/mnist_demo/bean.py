@@ -7,7 +7,7 @@ class ServerInfo(BaseModel):
 
 
 class FedModel(BaseModel):
-    input_model_base64: str = None
-    main_model_base64: str = None
-    output_model_base64: str = None
+    input_model_base64: str = ""
+    main_model_base64: str = ""
+    output_model_base64: str = ""
     type: str = "fl"

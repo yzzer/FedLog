@@ -14,6 +14,7 @@ class ServerGroup(BaseModel):
     server_host: str
     server_port: int
     id: int
+    weight: float = 1.0
 
 
 class Config(BaseModel):
@@ -63,6 +64,7 @@ def parse_server_config():
                                        client_port=items["client_port"], 
                                        server_host=items["server_host"],
                                        server_port=items["server_port"],
+                                       weight=items["weight"],
                                        id=item_id)
             conf_instance.server_groups[item_id] = server_group
         conf_instance.server_config = conf_instance.server_groups[server_id]

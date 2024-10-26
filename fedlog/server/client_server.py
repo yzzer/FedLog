@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from handler.mnist_demo.handler import MnistClientApp
 from handler.mnist_demo.bean import FedModel
 from utils.tensor import TensorData
+from utils.monitor import ProcessMonitor, Report
 
 # 创建 FastAPI 应用实例
 init_config()
@@ -20,25 +21,30 @@ app = FastAPI()
 async def root():
     return {"message": "Welcome to client!"}
 
-@app.post("/mnist/demo/forward/")
+@app.post("/mnist/demo/forward")
 async def mnist_output_forward(input: TensorData):
     return MnistClientApp.get_instance().forward_output(input)
 
 
-@app.get("/mnist/demo/start/")
+@app.get("/mnist/demo/start")
 async def start_mnist_job(mode: str = "fl", local_epoch: int = 5, batch: int = 512):
     if mode == "fl":
-        return MnistClientApp.get_instance().start_fl_job(local_epoch, batch)
+        res =  MnistClientApp.get_instance().start_fl_job(local_epoch, batch)
     else:
-        return MnistClientApp.get_instance().start_sl_job(local_epoch, batch)
+        res = MnistClientApp.get_instance().start_sl_job(local_epoch, batch)
+    ProcessMonitor.get_instance().start_monitor()
+    return res
+@app.get("/report")
+async def get_report():
+    return ProcessMonitor.get_instance().stop_monitor()
 
 
-@app.get("/mnist/demo/get_model/")
+@app.get("/mnist/demo/get_model")
 async def get_mnist_model(mode: str = "fl"):
     return MnistClientApp.get_instance().get_model(mode)
 
 
-@app.post("/mnist/demo/send_model/")
+@app.post("/mnist/demo/send_model")
 async def send_mnist_model(model: FedModel):
     return MnistClientApp.get_instance().send_model(model)
 
@@ -48,4 +54,4 @@ if __name__ == "__main__":
     conf = get_config()
     
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=conf.server_config.client_port, workers=1)
+    uvicorn.run(app, host="0.0.0.0", port=conf.server_config.client_port)

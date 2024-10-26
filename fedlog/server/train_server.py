@@ -28,16 +28,16 @@ async def ping():
     return {"message": "ping successfully"}
 
 
-@app.get("/mnist/demo/model/")
+@app.get("/mnist/demo/model")
 async def mnist_model():
     return MnistTrainServerApp.get_instance().get_model()
 
-@app.post("/mnist/demo/send_model/")
+@app.post("/mnist/demo/send_model")
 async def send_mnist_model(model: FedModel):
     return MnistTrainServerApp.get_instance().send_model(model)
 
 
-@app.post("/mnist/demo/forward/")
+@app.post("/mnist/demo/forward")
 async def mnist_forward(tensor: TensorData):
     return MnistTrainServerApp.get_instance().forward(tensor)
 
@@ -47,4 +47,4 @@ if __name__ == "__main__":
     conf = get_config()
     
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=conf.server_config.server_port, workers=1)
+    uvicorn.run(app, host="0.0.0.0", port=conf.server_config.server_port)

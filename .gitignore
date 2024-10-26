@@ -1,2 +1,5 @@
 data/*
 *.pyc
+*.log
+*/logs
+cache.json
