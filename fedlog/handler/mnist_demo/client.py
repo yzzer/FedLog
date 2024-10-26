@@ -17,15 +17,23 @@ from utils.tensor import (
 from utils.monitor import Report
 
 
+def get_session():
+    global conn_session
+    if conn_session is None:
+        conn_session = requests.Session()
+    return conn_session
+
+
 class TrainService:
     def __init__(self, host, port):
         self.host = host
         self.port = port
         self.address = f"http://{self.host}:{self.port}"
+        self.session = get_session()
 
     def ping(self):
         url = self.address + "/ping"
-        resp = requests.get(url=url)
+        resp = self.session.get(url)
         assert resp.status_code == 200
 
     def forward(self, input):
@@ -34,7 +42,7 @@ class TrainService:
         """
         tensor_data = TensorData(tensor=tensor_to_base64(input), shape=list(input.shape))
         url = self.address + "/mnist/demo/forward"
-        resp = requests.post(url=url, data=tensor_data.model_dump_json())
+        resp = self.session.post(url=url, data=tensor_data.model_dump_json())
         assert resp.status_code == 200
         grad_tensor_data = TensorData(**resp.json())
         grad = base64_to_tensor(grad_tensor_data.tensor, grad_tensor_data.shape)
@@ -42,7 +50,7 @@ class TrainService:
 
     def load_model(self, model: nn.Module):
         url = self.address + "/mnist/demo/model"
-        resp = requests.get(url)
+        resp = self.session.get(url)
         assert resp.status_code == 200
         load_state_from_base64(resp.text, model)
         
@@ -52,12 +60,12 @@ class TrainService:
             type="sl"
         )
         url = self.address + "/mnist/demo/send_model"
-        resp = requests.post(url=url, data=model_do.model_dump_json())
+        resp = self.session.post(url=url, data=model_do.model_dump_json())
         assert resp.status_code == 200
     
     def get_model(self):
         url = self.address + "/mnist/demo/model"
-        resp = requests.get(url)
+        resp = self.session.get(url)
         assert resp.status_code == 200
         return base64_to_state(resp.text)
 
@@ -67,6 +75,7 @@ class ClientSevice:
         self.host = host
         self.port = port
         self.address = f"http://{self.host}:{self.port}"
+        self.session = get_session()
         
 
     def forward(self, input: torch.Tensor):
@@ -75,7 +84,7 @@ class ClientSevice:
         """
         tensor_data = TensorData(tensor=tensor_to_base64(input), shape=list(input.shape))
         url = self.address + "/mnist/demo/forward"
-        resp = requests.post(url=url, data=tensor_data.model_dump_json())
+        resp = self.session.post(url=url, data=tensor_data.model_dump_json())
         assert resp.status_code == 200
         grad_tensor_data = TensorData(**resp.json())
         grad = base64_to_tensor(grad_tensor_data.tensor, grad_tensor_data.shape)
@@ -95,20 +104,20 @@ class ClientSevice:
                 type=mode
             )
         url = self.address + "/mnist/demo/send_model"
-        resp = requests.post(url=url, data=model_do.model_dump_json())
+        resp = self.session.post(url=url, data=model_do.model_dump_json())
         assert resp.status_code == 200
 
         
     
     def start_job(self, mode, local_epoch=3, global_epoch=10):
         url = self.address + "/mnist/demo/start"
-        resp = requests.get(url=url, params={"mode": mode, "local_epoch": local_epoch, "global_epoch": global_epoch})
+        resp = self.session.get(url=url, params={"mode": mode, "local_epoch": local_epoch, "global_epoch": global_epoch})
         assert resp.status_code == 200
         return resp.json()
     
     def get_report(self) -> Report:
         url = self.address + "/report"
-        resp = requests.get(url)
+        resp = self.session.get(url)
         assert resp.status_code == 200
         return Report(**resp.json())
 
@@ -119,6 +128,7 @@ class MnistFedService:
         self.host = conf.fedserver.host
         self.port = conf.fedserver.port
         self.address = f"http://{self.host}:{self.port}"
+        self.session = get_session()
         
     def collect_model(self, model: MnistModel, type: str):
         if type == "sl":
@@ -133,5 +143,5 @@ class MnistFedService:
                 type=type
             )
         url = self.address + "/mnist/demo/collect_model"
-        resp = requests.post(url=url, data=model_do.model_dump_json())
+        resp = self.session.post(url=url, data=model_do.model_dump_json())
         assert resp.status_code == 200
