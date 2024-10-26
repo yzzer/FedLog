@@ -168,6 +168,10 @@ class MnistFedApp:
         
         import time
         self.start_time = time.time()
+        self.now_global_epoch = 0
+        self.target_global_epoch = global_epoch
+        self.global_model = MnistModel()
+        
         def start_job(client: ClientSevice):
             client.start_job(mode, local_epoch, global_epoch)
             return True
