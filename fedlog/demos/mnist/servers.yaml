@@ -3,37 +3,37 @@ servers:
     weight: 1.
     client_host: 10.29.85.42
     client_port: 16877
-    server_host: 10.29.218.234
+    server_host: 10.112.195.22
     server_port: 16899
 
   1:
     weight: 1.
     client_host: 10.29.85.42
     client_port: 16878
-    server_host: 10.29.218.234
+    server_host: 10.112.195.22
     server_port: 16900
 
   2:
     weight: 1.
     client_host: 10.29.85.42
     client_port: 16879
-    server_host: 10.29.218.234
+    server_host: 10.112.195.22
     server_port: 16801
 
   3:
     weight: 1.
     client_host: 10.29.85.42
     client_port: 16880
-    server_host: 10.29.218.234
+    server_host: 10.112.195.22
     server_port: 16802
 
   4:
     weight: 1.
     client_host: 10.29.85.42
     client_port: 16881
-    server_host: 10.29.218.234
+    server_host: 10.112.195.22
     server_port: 16803
 
 fedserver:
-  host: 10.29.218.234
+  host: 10.112.195.22
   port: 17344
