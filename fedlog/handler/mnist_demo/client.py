@@ -16,6 +16,7 @@ from utils.tensor import (
 )
 from utils.monitor import Report
 
+conn_session = None
 
 def get_session():
     global conn_session
