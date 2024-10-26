@@ -47,4 +47,4 @@ if __name__ == "__main__":
     conf = get_config()
     
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=conf.server_config.server_port, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=conf.server_config.server_port, log_level="info", timeout_keep_alive=300)

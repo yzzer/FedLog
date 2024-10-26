@@ -37,4 +37,4 @@ async def collect_mnist_model(model: FedModel):
 # 启动命令（如果以脚本形式运行该文件）
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=get_config().fedserver.port, log_level=logging.INFO)
+    uvicorn.run(app, host="0.0.0.0", port=get_config().fedserver.port, log_level=logging.INFO, timeout_keep_alive=300)
