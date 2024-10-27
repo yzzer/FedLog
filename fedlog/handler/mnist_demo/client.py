@@ -110,9 +110,9 @@ class ClientSevice:
 
         
     
-    def start_job(self, mode, local_epoch=3, global_epoch=10):
+    def start_job(self, mode, local_epoch=3, global_epoch=10, batch=512):
         url = self.address + "/mnist/demo/start"
-        resp = self.session.get(url=url, params={"mode": mode, "local_epoch": local_epoch, "global_epoch": global_epoch})
+        resp = self.session.get(url=url, params={"mode": mode, "local_epoch": local_epoch, "global_epoch": global_epoch, "batch": batch})
         assert resp.status_code == 200
         return resp.json()
     

@@ -25,8 +25,8 @@ async def ping():
     return {"message": "ping successfully"}
 
 @app.get("/mnist/demo/start_job")
-async def start_mnist_job(mode: str = "fl", local_epoch: int = 5, global_epoch: int = 10):
-    return MnistFedApp.get_instance().start_job(mode, local_epoch, global_epoch)
+async def start_mnist_job(mode: str = "fl", local_epoch: int = 5, global_epoch: int = 10, batch: int = 512):
+    return MnistFedApp.get_instance().start_job(mode, local_epoch, global_epoch, batch)
 
 
 @app.post("/mnist/demo/collect_model")

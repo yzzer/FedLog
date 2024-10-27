@@ -163,7 +163,7 @@ class MnistFedApp:
         return MonitorReportor.merge_report(list(reports))
         
             
-    def start_job(self, mode="fl", local_epoch=3, global_epoch=10):
+    def start_job(self, mode="fl", local_epoch=3, global_epoch=10, batch=512):
         self.mode = mode
         
         import time
@@ -173,7 +173,7 @@ class MnistFedApp:
         self.global_model = MnistModel()
         
         def start_job(client: ClientSevice):
-            client.start_job(mode, local_epoch, global_epoch)
+            client.start_job(mode, local_epoch, global_epoch, batch=batch)
             return True
         if not all(self.workers.map(start_job, self.clients)):
             raise Exception("start job failed")
