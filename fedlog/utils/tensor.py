@@ -46,3 +46,11 @@ def load_state_from_base64(base64_str: str, model: torch.nn.Module):
 
 def base64_to_state(base64_str: str) -> dict:
     return pickle.loads(base64.b64decode(base64_str))
+
+if __name__ == "__main__":
+    a = torch.rand(100, 100)
+    b = tensor_to_base64(a)
+    c = base64_to_tensor(b, a.shape)
+    print(a)
+    print(c)
+    print(torch.allclose(a, c))

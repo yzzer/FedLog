@@ -51,7 +51,7 @@ class MnistTrainServerApp:
             MnistTrainServerApp.app = MnistTrainServerApp()
         return MnistTrainServerApp.app
 
-    def forward(self, tensor: TensorData) -> TensorData:
+    def forward(self, tensor: TensorData) -> bytes:
         self.optimizer.zero_grad()
         
         # get grad

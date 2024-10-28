@@ -6,7 +6,7 @@ import sys
 
 sys.path.append("..")
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from config import init_config, get_config
 from handler.mnist_demo.handler import MnistTrainServerApp
 from handler.mnist_demo.bean import FedModel
@@ -38,8 +38,8 @@ async def send_mnist_model(model: FedModel):
 
 
 @app.post("/mnist/demo/forward")
-async def mnist_forward(tensor: bytes):
-    return MnistTrainServerApp.get_instance().forward(tensor)
+async def mnist_forward(req: Request):
+    return MnistTrainServerApp.get_instance().forward(req.body())
 
 
 # 启动命令（如果以脚本形式运行该文件）

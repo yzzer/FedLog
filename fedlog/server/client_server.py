@@ -5,7 +5,7 @@ import sys
 sys.path.append("..")
 
 from config import init_config, get_config
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from handler.mnist_demo.handler import MnistClientApp
 from handler.mnist_demo.bean import FedModel
@@ -22,8 +22,8 @@ async def root():
     return {"message": "Welcome to client!"}
 
 @app.post("/mnist/demo/forward")
-async def mnist_output_forward(input: bytes):
-    return MnistClientApp.get_instance().forward_output(input)
+async def mnist_output_forward(req: Request):
+    return MnistClientApp.get_instance().forward_output(req.body())
 
 
 @app.get("/mnist/demo/start")
