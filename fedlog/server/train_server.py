@@ -38,7 +38,7 @@ async def send_mnist_model(model: FedModel):
 
 
 @app.post("/mnist/demo/forward")
-async def mnist_forward(tensor: TensorData):
+async def mnist_forward(tensor: bytes):
     return MnistTrainServerApp.get_instance().forward(tensor)
 
 

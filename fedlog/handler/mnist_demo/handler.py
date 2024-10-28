@@ -55,7 +55,7 @@ class MnistTrainServerApp:
         self.optimizer.zero_grad()
         
         # get grad
-        input = base64_to_tensor(tensor.tensor, shape=tensor.shape)
+        input = base64_to_tensor(tensor, shape=None)
         input.requires_grad_()
         output = self.model.main_model(input)
         grad = self.client.forward(output)
@@ -64,7 +64,7 @@ class MnistTrainServerApp:
         output.backward(grad)
         self.optimizer.step()
         grad = input.grad
-        return TensorData(tensor=tensor_to_base64(grad), shape=grad.shape)
+        return tensor_to_base64(grad)
 
     def get_model(self) -> str:
         return model_to_base64(self.model.main_model)
@@ -382,9 +382,9 @@ class MnistClientApp:
 
         logging.info("sl env prepared")
 
-    def forward_output(self, input: TensorData) -> TensorData:
+    def forward_output(self, input: bytes) -> TensorData:
         self.output_optimizer.zero_grad()
-        input = base64_to_tensor(input.tensor, input.shape)
+        input = base64_to_tensor(input, None)
         input.requires_grad_()
 
         output = self.model.output_model(input)
@@ -395,7 +395,7 @@ class MnistClientApp:
         self.output_optimizer.step()
 
         grad = input.grad
-        grad = TensorData(tensor=tensor_to_base64(grad), shape=grad.shape)
+        grad = tensor_to_base64(grad)
 
         logging.info(f"epoch = {self.now_epoch} loss = {loss.item():.4f}")
         return grad

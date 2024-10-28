@@ -22,7 +22,7 @@ async def root():
     return {"message": "Welcome to client!"}
 
 @app.post("/mnist/demo/forward")
-async def mnist_output_forward(input: TensorData):
+async def mnist_output_forward(input: bytes):
     return MnistClientApp.get_instance().forward_output(input)
 
 
