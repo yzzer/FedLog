@@ -11,9 +11,11 @@ class MnistInputModel(InputModel):
     def __init__(self):
         super(MnistInputModel, self).__init__()
         self.input_layer = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=1)  # 输出: 16x28x28
-    
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        
     def forward(self, x):
-        return nn.ReLU()(self.input_layer(x))
+        return self.pool(nn.ReLU()(self.input_layer(x)))
+        # return nn.ReLU()(self.input_layer(x))
     
 
 class MnistOutputModel(OuputModel):
@@ -96,7 +98,8 @@ def train_and_eval():
         model.train()
         for images, labels in train_loader:
             images, labels = images.to(device), labels.to(device)
-            
+            output = model.input_model(images)
+            print(output.shape)
             # 前向传播
             outputs = model(images)
             loss = criterion(outputs, labels)
