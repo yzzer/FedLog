@@ -41,12 +41,12 @@ class TrainService:
         """
         传递输入, 并从远程训练服务器返回梯度
         """
-        tensor_data = TensorData(tensor=tensor_to_base64(input), shape=list(input.shape))
+        tensor_data = tensor_to_base64(input)
         url = self.address + "/mnist/demo/forward"
-        resp = self.session.post(url=url, data=tensor_data.model_dump_json())
+        resp = self.session.post(url=url, data=tensor_data)
         assert resp.status_code == 200
-        grad_tensor_data = TensorData(**resp.json())
-        grad = base64_to_tensor(grad_tensor_data.tensor, grad_tensor_data.shape)
+        grad_tensor_data = resp.content
+        grad = base64_to_tensor(grad_tensor_data, None)
         return grad
 
     def load_model(self, model: nn.Module):
@@ -83,12 +83,12 @@ class ClientSevice:
         """
         传递输入, 并从客户端服务器返回梯度
         """
-        tensor_data = TensorData(tensor=tensor_to_base64(input), shape=list(input.shape))
+        tensor_data = tensor_to_base64(input)
         url = self.address + "/mnist/demo/forward"
-        resp = self.session.post(url=url, data=tensor_data.model_dump_json())
+        resp = self.session.post(url=url, data=tensor_data)
         assert resp.status_code == 200
-        grad_tensor_data = TensorData(**resp.json())
-        grad = base64_to_tensor(grad_tensor_data.tensor, grad_tensor_data.shape)
+        grad_tensor_data = resp.content
+        grad = base64_to_tensor(grad_tensor_data, None)
         return grad
     
     
