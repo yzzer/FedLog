@@ -98,8 +98,8 @@ def train_and_eval():
         model.train()
         for images, labels in train_loader:
             images, labels = images.to(device), labels.to(device)
-            output = model.input_model(images)
-            print(output.shape)
+            # output = model.input_model(images)
+            # print(output.shape)
             # 前向传播
             outputs = model(images)
             loss = criterion(outputs, labels)
