@@ -224,8 +224,8 @@ class MnistFedApp:
                     
                 if finish_global_epoch:
                     self.now_global_epoch += 1
-                    if self.now_global_epoch <= self.target_global_epoch:
-                        self._eval()
+                    self._eval()
+                    if self.now_global_epoch < self.target_global_epoch:
                         self._broadcast_model()
                     else:
                         import time
