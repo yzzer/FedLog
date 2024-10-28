@@ -39,7 +39,8 @@ async def send_mnist_model(model: FedModel):
 
 @app.post("/mnist/demo/forward")
 async def mnist_forward(req: Request):
-    return MnistTrainServerApp.get_instance().forward(req.body())
+    input = await req.body()
+    return MnistTrainServerApp.get_instance().forward(input)
 
 
 # 启动命令（如果以脚本形式运行该文件）
