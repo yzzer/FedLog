@@ -23,7 +23,7 @@ async def root():
 
 @app.post("/mnist/demo/forward")
 async def mnist_output_forward(req: Request):
-    input = req.body()
+    input = await req.body()
     return MnistClientApp.get_instance().forward_output(input)
 
 
