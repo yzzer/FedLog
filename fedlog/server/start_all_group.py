@@ -35,7 +35,9 @@ def start_client_nohup(config_path: str, log_dir: str, client_id: int):
     import subprocess
     import sys
 
-    command = f"nohup trickle -d 1250 -u 1250 {sys.executable} client_server.py --config {config_path} --id {client_id} > {log_dir}/client-{client_id}.log 2>&1 & echo $!"
+    # command = f"nohup trickle -d 1250 -u 1250 {sys.executable} client_server.py --config {config_path} --id {client_id} > {log_dir}/client-{client_id}.log 2>&1 & echo $!"
+    command = f"nohup {sys.executable} client_server.py --config {config_path} --id {client_id} > {log_dir}/client-{client_id}.log 2>&1 & echo $!"
+    
     # 使用 subprocess.Popen 启动服务并将其置于后台
     result = subprocess.check_output(command, shell=True)
     return int(result.decode().strip())
