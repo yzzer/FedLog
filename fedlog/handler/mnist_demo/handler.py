@@ -57,13 +57,9 @@ class MnistTrainServerApp:
         
         # get grad
         input = base64_to_tensor(tensor, shape=None)
-        if torch.cuda.is_available():
-            input = input.cuda()
         input.requires_grad_()
         output = self.model.main_model(input)
         grad = self.client.forward(output)
-        if torch.cuda.is_available():
-            grad = grad.cuda()
             
         # backward
         output.backward(grad)

@@ -37,7 +37,8 @@ def base64_to_tensor(base64_str: bytes, shape: list) -> torch.Tensor:
     bf.truncate(0)  # 清空缓冲区
     bf.write(base64_str)
     bf.seek(0)
-    tensor = torch.load(bf, map_location="cpu")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    tensor = torch.load(bf, map_location=device)
     return tensor
 
 
