@@ -31,7 +31,7 @@ def tensor_to_base64(tensor: torch.Tensor) -> bytes:
 
 
 # 将 Base64 解码并反序列化为 Tensor
-def base64_to_tensor(base64_str: bytes, shape: list) -> torch.Tensor:
+def base64_to_tensor(base64_str: bytes, device: list) -> torch.Tensor:
     bf = get_buffer()
     bf.seek(0)  # 移动指针到开头
     bf.truncate(0)  # 清空缓冲区

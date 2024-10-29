@@ -38,6 +38,7 @@ class MnistTrainServerApp:
 
         self.optimizer: optim.SGD = None
         self.criterion = nn.CrossEntropyLoss()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.client: ClientSevice = ClientSevice(
             host=get_config().server_config.client_host,
@@ -56,10 +57,14 @@ class MnistTrainServerApp:
         
         # get grad
         input = base64_to_tensor(tensor, shape=None)
+        if torch.cuda.is_available():
+            input = input.cuda()
         input.requires_grad_()
         output = self.model.main_model(input)
         grad = self.client.forward(output)
-
+        if torch.cuda.is_available():
+            grad = grad.cuda()
+            
         # backward
         output.backward(grad)
         self.optimizer.step()
@@ -71,6 +76,8 @@ class MnistTrainServerApp:
     
     def send_model(self, model: FedModel):
         load_state_from_base64(model.main_model_base64, self.model.main_model)
+        if torch.cuda.is_available():
+            self.model.main_model = self.model.main_model.cuda()
 
 
 class MnistFedApp:
