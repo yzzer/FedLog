@@ -19,15 +19,15 @@ class MnistInputModel(InputModel):
     def __init__(self):
         super(MnistInputModel, self).__init__()
         self.input_layer = nn.Conv2d(in_channels=1, out_channels=16, kernel_size=1)  # 输出: 16x28x28
-        self.conv1 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1)  # 输入: 16x28x28, 输出: 32x28x28
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)  # 输入: 32x28x28, 输出: 64x28x28
+        # self.conv1 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1)  # 输入: 16x28x28, 输出: 32x28x28
+        # self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)  # 输入: 32x28x28, 输出: 64x28x28
         
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
         
     def forward(self, x):
         x = self.pool(nn.ReLU()(self.input_layer(x)))
-        x = self.pool(nn.ReLU()(self.conv1(x)))
-        x = self.pool(nn.ReLU()(self.conv2(x)))     
+        # x = self.pool(nn.ReLU()(self.conv1(x)))
+        # x = self.pool(nn.ReLU()(self.conv2(x)))     
         return x
         # return nn.ReLU()(self.input_layer(x))
     
@@ -45,11 +45,11 @@ class MnistMainModel(nn.Module):
     def __init__(self):
         super(MnistMainModel, self).__init__()
          # 卷积层1
-        # self.conv1 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1)  # 输入: 16x28x28, 输出: 32x28x28
-        # self.pool = nn.MaxPool2d(kernel_size=2, stride=2)  # 池化层
+        self.conv1 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1)  # 输入: 16x28x28, 输出: 32x28x28
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)  # 池化层
         
         # 卷积层2
-        # self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)  # 输入: 32x28x28, 输出: 64x28x28
+        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)  # 输入: 32x28x28, 输出: 64x28x28
         
         # 自适应平均池化层
         self.adaptive_pool = nn.AdaptiveAvgPool2d((7, 7))  # 输出: 64x7x7
@@ -58,8 +58,8 @@ class MnistMainModel(nn.Module):
         self.fc1 = nn.Linear(64 * 7 * 7, 128)  # 输入: 64*7*7, 输出: 128
         
     def forward(self, x):
-        # x = self.pool(nn.ReLU()(self.conv1(x)))  # 第一个卷积层 + 激活 + 池化
-        # x = self.pool(nn.ReLU()(self.conv2(x)))  # 第二个卷积层 + 激活 + 池化
+        x = self.pool(nn.ReLU()(self.conv1(x)))  # 第一个卷积层 + 激活 + 池化
+        x = self.pool(nn.ReLU()(self.conv2(x)))  # 第二个卷积层 + 激活 + 池化
         
         x = self.adaptive_pool(x)  # 自适应平均池化层
         x = x.view(-1, 64 * 7 * 7)  # 展平
